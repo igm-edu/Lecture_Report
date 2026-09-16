@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>강의평가 확인서 생성기</title>
+<style>
+  :root{
+    --navy:#03428E; --navy-dk:#022f66; --line:#dfe3e8; --bg:#f4f6f9;
+    --txt:#1f2328; --muted:#6b7480; --ok:#1b7f3b; --err:#c62828;
+    --q-quant:#BFDBFD; --q-qual:#C5D9F1;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:'Pretendard','Malgun Gothic','맑은 고딕','Nanum Gothic',sans-serif;font-size:14px;line-height:1.55}
+  header{background:var(--navy);color:#fff;padding:20px 24px}
+  header h1{margin:0;font-size:19px;font-weight:700;letter-spacing:-.3px}
+  header p{margin:5px 0 0;font-size:12.5px;opacity:.82}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 20px 60px}
+
+  .step{background:#fff;border:1px solid var(--line);border-radius:10px;margin-bottom:16px;overflow:hidden}
+  .step.off{opacity:.45;pointer-events:none}
+  .step > h2{margin:0;padding:13px 18px;font-size:13.5px;font-weight:700;background:#fafbfc;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:9px}
+  .num{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;border-radius:50%;
+    background:var(--navy);color:#fff;font-size:11.5px;font-weight:700;flex:0 0 auto}
+  .body{padding:18px}
+
+  /* 드롭존 */
+  #drop{border:2px dashed #c3cbd5;border-radius:9px;padding:34px 20px;text-align:center;background:#fbfcfd;
+    cursor:pointer;transition:.15s}
+  #drop:hover,#drop.over{border-color:var(--navy);background:#eef4fc}
+  #drop b{display:block;font-size:14.5px;margin-bottom:5px}
+  #drop span{color:var(--muted);font-size:12.5px}
+  #fileInfo{display:none;margin-top:13px;padding:11px 14px;background:#eef7f0;border-left:3px solid var(--ok);
+    border-radius:0 5px 5px 0;font-size:12.8px}
+
+  /* 폼 */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:13px 15px}
+  .fld label{display:block;font-size:12px;font-weight:700;color:#454d57;margin-bottom:4px}
+  .fld label i{font-style:normal;font-weight:400;color:var(--muted)}
+  input[type=text],input[type=date],input[type=time],input[type=number],select{
+    width:100%;padding:8px 10px;border:1px solid #cfd6de;border-radius:6px;font-size:13.5px;
+    font-family:inherit;background:#fff;color:var(--txt)}
+  input:focus,select:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 3px rgba(3,66,142,.11)}
+  .trio{display:flex;gap:7px}
+  .trio input{flex:1;min-width:0}
+  .trio input.h{flex:0 0 70px}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:5px}
+
+  /* 문항 매핑 */
+  .maprow{margin-top:16px}
+  .maprow > b{display:block;font-size:12px;color:#454d57;margin-bottom:6px}
+  .qlist{border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .qitem{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border-bottom:1px solid #eef1f4;font-size:13px}
+  .qitem:last-child{border-bottom:0}
+  .qitem input{margin:3px 0 0;flex:0 0 auto;width:15px;height:15px;accent-color:var(--navy)}
+  .qitem label{cursor:pointer;flex:1}
+  .qitem .meta{color:var(--muted);font-size:11.5px;margin-top:2px}
+
+  /* 미리보기 */
+  .pv{border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:12.5px}
+  .pv .t{background:var(--navy);color:#fff;padding:9px 13px;font-weight:700;font-size:13px}
+  .pv .info{padding:10px 13px;border-bottom:1px solid var(--line);background:#fafbfc;color:#3c444e}
+  .pv .info span{display:inline-block;margin-right:16px}
+  .pv .q{padding:7px 13px;font-weight:700;border-top:1px solid var(--line)}
+  .pv .q.quant{background:var(--q-quant)}
+  .pv .q.qual{background:var(--q-qual)}
+  .pv ul{margin:0;padding:6px 13px 9px;list-style:none}
+  .pv li{padding:3px 0;border-bottom:1px dotted #eceff2;display:flex;gap:9px}
+  .pv li:last-child{border-bottom:0}
+  .pv li .n{color:var(--muted);flex:0 0 40px;text-align:right;font-variant-numeric:tabular-nums}
+  .pv li.tall .n{color:#c77700;font-weight:700}
+  .pv .dist{padding:9px 13px;display:flex;flex-wrap:wrap;gap:6px}
+  .pv .dist div{border:1px solid var(--line);border-radius:5px;padding:3px 8px;background:#fff}
+  .pv .dist b{color:var(--navy)}
+
+  /* 버튼 */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:11px 22px;border:0;border-radius:7px;
+    background:var(--navy);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+  .btn:hover{background:var(--navy-dk)}
+  .btn:disabled{background:#a8b1bc;cursor:default}
+  .btn.ghost{background:#fff;color:var(--navy);border:1.5px solid var(--navy)}
+  .btn.ghost:hover{background:#eef4fc}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px}
+
+  #msg{margin-top:13px;padding:11px 14px;border-radius:6px;font-size:13px;display:none}
+  #msg.ok{background:#eaf5ec;color:var(--ok);border-left:3px solid var(--ok)}
+  #msg.err{background:#fdeceb;color:var(--err);border-left:3px solid var(--err)}
+  footer{text-align:center;color:var(--muted);font-size:11.5px;padding:0 20px 30px}
+  @media(max-width:600px){.wrap{padding:14px 12px 40px}.body{padding:14px}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>강의평가 확인서 생성기</h1>
+  <p>설문 로우데이터(.xlsx)를 올리면 서식이 적용된 강의평가결과 파일을 내려받습니다</p>
+</header>
+
+<div class="wrap">
+
+  <!-- STEP 1 -->
+  <section class="step" id="s1">
+    <h2><span class="num">1</span> 로우데이터 업로드</h2>
+    <div class="body">
+      <div id="drop">
+        <b>엑셀 파일을 끌어다 놓거나 클릭해서 선택</b>
+        <span>Forms에서 내려받은 응답 파일 (.xlsx) · 1행 = 문항, 2행부터 = 응답</span>
+      </div>
+      <input type="file" id="file" accept=".xlsx,.xlsm" hidden>
+      <div id="fileInfo"></div>
+    </div>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="step off" id="s2">
+    <h2><span class="num">2</span> 기본 정보</h2>
+    <div class="body">
+      <div class="grid">
+        <div class="fld"><label>고객사</label><input type="text" id="client" placeholder="시노펙스"></div>
+        <div class="fld"><label>과정명</label><input type="text" id="course" placeholder="경영기획, 전략 직무 AI 실무 활용 과정"></div>
+        <div class="fld"><label>회차 <i>(선택)</i></label><input type="text" id="round" placeholder="1차"></div>
+        <div class="fld"><label>교육일</label><input type="date" id="date"></div>
+        <div class="fld">
+          <label>시간 <i>(시작 · 종료 · 교육시간)</i></label>
+          <div class="trio">
+            <input type="time" id="start" value="09:00">
+            <input type="time" id="end" value="17:00">
+            <input type="text" id="hours" class="h" placeholder="7H">
+          </div>
+        </div>
+        <div class="fld"><label>장소</label><input type="text" id="place" placeholder="동탄사업장 4층 강의실"></div>
+        <div class="fld"><label>강사</label><input type="text" id="teacher" placeholder="김태유 박사"></div>
+        <div class="fld">
+          <label>참석 인원</label>
+          <input type="number" id="attend" min="1">
+          <div class="hint" id="rateHint"></div>
+        </div>
+      </div>
+
+      <div class="maprow">
+        <b>1번 · 정량 문항 (10점 척도)</b>
+        <select id="scoreCol"></select>
+      </div>
+
+      <div class="maprow">
+        <b>2번부터 · 정성 문항 <i style="font-weight:400;color:var(--muted)">(체크한 순서대로 번호가 매겨집니다)</i></b>
+        <div class="qlist" id="qlist"></div>
+      </div>
+
+      <div class="bar" style="margin-top:18px">
+        <button class="btn" id="build">미리보기 생성</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="step off" id="s3">
+    <h2><span class="num">3</span> 확인 후 다운로드</h2>
+    <div class="body">
+      <div id="preview"></div>
+      <div class="bar" style="margin-top:16px">
+        <button class="btn" id="dl">XLSX 다운로드</button>
+        <button class="btn ghost" id="reset">처음부터 다시</button>
+      </div>
+      <div id="msg"></div>
+    </div>
+  </section>
+
+</div>
+
+<footer>ExcelJS 기반 · 인터넷 연결 없이 동작합니다 · 업로드한 파일은 브라우저 밖으로 전송되지 않습니다</footer>
+
+<!-- 읽기: SheetJS (Forms 내보내기 파일도 문제없이 파싱) / 쓰기: ExcelJS (서식 지원) -->
+<script src="xlsx.full.min.js"></script>
+<script src="exceljs.min.js"></script>
+<script>
+/* ==========================================================
+   설정 — 색·폰트·행높이·열너비 (원본 양식에서 추출한 값)
+   ========================================================== */
+const CFG = {
+  FONT_TITLE:'나눔스퀘어', FONT_BODY:'나눔고딕',
+  C_TITLE_BG:'FF03428E', C_TITLE_FG:'FFFFFFFF',
+  C_Q_QUANT:'FFBFDBFD', C_Q_QUAL:'FFC5D9F1',
+  C_TABLE_HEAD:'FFD9D9D9', C_ANSWER_BG:'FFFFFFFF',
+  C_RED:'FFFF0000', C_HELPER:'FF808080',
+  SZ_TITLE:16, SZ_LABEL:11, SZ_ANSWER:10, SZ_HELPER:9,
+  H_ROW1:13.15, H_TITLE:30, H_INFO:20.1, H_TABLE:43.9,
+  H_HEAD:18.95, H_SHORT:18.95, H_TALL:30, H_BLANK:18.95,
+  WRAP_LEN:80,
+  WIDTHS:{1:1.875,2:1.875,3:8.875,4:5.75,5:16.875,6:5.875,7:4.625,8:8.43,9:9.5,
+          10:4.125,11:4.125,12:4.125,13:4.125,14:4.125,15:4.125,16:4.125,17:4.125,18:4.125,19:4.125,
+          20:9.25,21:2.875,22:3.375,23:12.75,24:9},
+  META:['ID','시작 시간','완료 시간','전자 메일','이름','마지막으로 수정한 시간',
+        'Start time','Completion time','Email','Name','Last modified time']
+};
+const COL = {B:2,C:3,D:4,E:5,G:7,I:9,J:10,S:19,T:20,V:22};
+
+/* ==========================================================
+   상태
+   ========================================================== */
+let RAW = null;   // {headers:[], body:[[]], name:''}
+let PLAN = null;  // 생성 계획
+
+/* ==========================================================
+   유틸
+   ========================================================== */
+const $ = id => document.getElementById(id);
+
+/** 셀 값 → 문자열 (줄바꿈·비가시문자 정규화) */
+function cellText(v){
+  if (v === null || v === undefined) return '';
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === 'object'){
+    if (Array.isArray(v.richText)) return v.richText.map(t => t.text).join('');
+    if ('result' in v) return cellText(v.result);
+    if ('text' in v) return String(v.text);
+    return '';
+  }
+  return String(v);
+}
+const clean = s => String(s ?? '')
+  .replace(/ /g,' ')      // 비줄바꿈 공백
+  .replace(/\r\n?/g,'\n')      // CRLF / CR → LF
+  .trim();
+const firstLine = s => clean(s).split('\n')[0].trim();
+const pad2 = n => n < 10 ? '0'+n : ''+n;
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function show(html, cls){
+  const m = $('msg'); m.innerHTML = html; m.className = cls; m.style.display='block';
+}
+
+/* ==========================================================
+   STEP 1 — 파일 읽기
+   ========================================================== */
+const drop = $('drop');
+drop.onclick = () => $('file').click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => {
+  e.preventDefault(); drop.classList.remove('over');
+  if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
+};
+$('file').onchange = e => { if (e.target.files[0]) readFile(e.target.files[0]); };
+
+async function readFile(f){
+  try {
+    const buf = await f.arrayBuffer();
+    const wb = XLSX.read(new Uint8Array(buf), { type:'array', cellDates:false });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) throw new Error('시트를 찾을 수 없습니다.');
+
+    const rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'', blankrows:false });
+    if (rows.length < 2) throw new Error('응답 데이터가 없습니다.');
+
+    const nCol = Math.max(...rows.map(r => r.length));
+    const headers = [];
+    for (let c = 0; c < nCol; c++) headers.push(clean(rows[0][c]));
+
+    const body = [];
+    for (let r = 1; r < rows.length; r++){
+      const row = [];
+      let any = false;
+      for (let c = 0; c < nCol; c++){
+        const t = clean(rows[r][c]);
+        row.push(t);
+        if (t) any = true;
+      }
+      if (any) body.push(row);
+    }
+    if (!body.length) throw new Error('응답 데이터가 없습니다.');
+
+    RAW = { headers, body, name: f.name };
+    $('fileInfo').style.display = 'block';
+    $('fileInfo').innerHTML = '<b>'+esc(f.name)+'</b> · 응답 '+body.length+'건 · 컬럼 '+headers.filter(Boolean).length+'개';
+    $('s2').classList.remove('off');
+    analyze();
+    prefillFromName(f.name);
+  } catch(err){
+    $('fileInfo').style.display='block';
+    $('fileInfo').style.borderColor='#c62828';
+    $('fileInfo').textContent = '읽기 실패: ' + err.message;
+  }
+}
+
+/** 파일명에서 고객사/과정명 추정: "[시노펙스] 과정명(1-11).xlsx" */
+function prefillFromName(name){
+  let n = name.replace(/\.(xlsx|xlsm)$/i,'').replace(/\(\d+-\d+\)\s*$/,'').trim();
+  const m = n.match(/^\[([^\]]+)\]\s*(.*)$/);
+  if (m){ if(!$('client').value) $('client').value = m[1].trim(); n = m[2]; }
+  if (!$('course').value) $('course').value = n.trim();
+  if (!$('date').value) $('date').value = new Date().toISOString().slice(0,10);
+}
+
+/* ==========================================================
+   STEP 2 — 컬럼 자동 분석 + 폼
+   ========================================================== */
+function analyze(){
+  const { headers, body } = RAW;
+  let scoreCol = -1; const qual = []; const stat = [];
+
+  for (let c = 0; c < headers.length; c++){
+    const h = headers[c];
+    if (!h || CFG.META.includes(h)){ stat.push(null); continue; }
+    let filled=0, num=0, txt=0;
+    for (const row of body){
+      const s = clean(row[c]);
+      if (!s) continue;
+      filled++;
+      const n = Number(s);
+      if (s !== '' && !isNaN(n) && n >= 1 && n <= 10 && n === Math.floor(n)) num++; else txt++;
+    }
+    if (!filled){ stat.push(null); continue; }
+    stat.push({filled,num,txt});
+    if (scoreCol === -1 && num/filled >= 0.8) scoreCol = c+1;
+    else if (txt/filled >= 0.5) qual.push(c+1);
+  }
+
+  // 정량 문항 드롭다운
+  const sc = $('scoreCol'); sc.innerHTML = '';
+  headers.forEach((h,i) => {
+    if (!h) return;
+    const o = document.createElement('option');
+    o.value = i+1; o.textContent = firstLine(h);
+    if (i+1 === scoreCol) o.selected = true;
+    sc.appendChild(o);
+  });
+
+  // 정성 문항 체크리스트
+  const list = $('qlist'); list.innerHTML = '';
+  headers.forEach((h,i) => {
+    if (!h || CFG.META.includes(h)) return;
+    const on = qual.includes(i+1);
+    const s = stat[i] || {filled:0};
+    const d = document.createElement('div');
+    d.className = 'qitem';
+    d.innerHTML =
+      '<input type="checkbox" id="q'+i+'" value="'+(i+1)+'"'+(on?' checked':'')+'>'+
+      '<label for="q'+i+'">'+esc(firstLine(h))+
+      '<div class="meta">응답 '+s.filled+'건</div></label>';
+    list.appendChild(d);
+  });
+
+  $('attend').value = body.length;
+  calcRate();
+}
+
+function toMin(t){ const p = t.split(':'); return +p[0]*60 + +p[1]; }
+function calcHours(){
+  const s = $('start').value, e = $('end').value;
+  if (!s || !e) return;
+  const d = toMin(e) - toMin(s);
+  if (d <= 0) return;
+  let h = Math.round(d/60);
+  if (h >= 6) h -= 1;                 // 점심시간 1시간 차감 (직접 수정 가능)
+  $('hours').value = h + 'H';
+}
+function calcRate(){
+  const a = +$('attend').value, r = RAW ? RAW.body.length : 0;
+  $('rateHint').textContent = (a>0 && r>0)
+    ? '응답 '+r+'명 / 참석 '+a+'명 → 응답률 '+(r/a*100).toFixed(1)+'%' : '';
+}
+$('start').onchange = calcHours;
+$('end').onchange = calcHours;
+$('attend').oninput = calcRate;
+calcHours();
+
+/* ==========================================================
+   규칙 1·5·10 — 답변 수집 / 중복 통합 / 글자수 내림차순
+   ========================================================== */
+function collectAnswers(colIdx){
+  const order = [], map = new Map();
+  for (const row of RAW.body){
+    const s = clean(row[colIdx]);
+    if (!s) continue;
+    if (map.has(s)) map.set(s, map.get(s)+1);
+    else { map.set(s,1); order.push(s); }
+  }
+  return order
+    .map((s,i) => {
+      const c = map.get(s);
+      return { text: c > 1 ? s + ' x ' + pad2(c) : s, i };   // 규칙 10
+    })
+    .sort((a,b) => (b.text.length - a.text.length) || (a.i - b.i))  // 규칙 5
+    .map(o => o.text);
+}
+
+/* ==========================================================
+   미리보기 생성
+   ========================================================== */
+$('build').onclick = () => {
+  const course = $('course').value.trim();
+  const round  = $('round').value.trim();
+  const attend = +$('attend').value;
+  if (!course)  return alert('과정명을 입력하세요.');
+  if (!$('date').value) return alert('교육일을 입력하세요.');
+  if (!attend)  return alert('참석 인원을 입력하세요.');
+
+  const qualCols = [...document.querySelectorAll('#qlist input:checked')].map(c => +c.value);
+  if (!qualCols.length) return alert('정성 문항을 하나 이상 선택하세요.');
+
+  const scoreCol = +$('scoreCol').value;
+  const 주제 = round ? course + '_' + round : course;
+  const hours = $('hours').value.trim();
+  const 일시 = $('date').value + ' ' + $('start').value + '~' + $('end').value + (hours ? ' ['+hours+']' : '');
+  const client = $('client').value.trim();
+
+  // 점수 집계
+  const tally = {}; for (let i=1;i<=10;i++) tally[i]=0;
+  for (const row of RAW.body){
+    const s = clean(row[scoreCol-1]); const n = Number(s);
+    if (s && !isNaN(n) && n>=1 && n<=10) tally[Math.floor(n)]++;
+  }
+  const counts = [10,9,8,7,6,5,4,3,2,1].map(s => tally[s]);
+  const total = counts.reduce((a,b)=>a+b,0);
+  const avg = total ? [10,9,8,7,6,5,4,3,2,1].reduce((a,s,i)=>a+s*counts[i],0)/total : 0;
+  const grade = avg>=9?'A+':avg>=8?'A':avg>=7?'B+':avg>=6?'B':avg>=5?'C+':avg>=4?'C':avg>=3?'D+':avg>=2?'D':' ';
+  const nps = total ? ((counts[0]+counts[1]) - (counts[4]+counts[5]+counts[6]+counts[7]+counts[8]+counts[9]))/total : 0;
+
+  PLAN = {
+    docTitle: (client ? client+' ' : '') + 주제 + '_강의평가결과',
+    일시, 장소:$('place').value.trim(), 주제, 강사:$('teacher').value.trim(), 참석인원:attend,
+    scoreHeader: firstLine(RAW.headers[scoreCol-1]),
+    counts, total, avg, grade, nps,
+    blocks: qualCols.map(c => ({ title: firstLine(RAW.headers[c-1]), answers: collectAnswers(c-1) }))
+  };
+
+  renderPreview();
+  $('s3').classList.remove('off');
+  $('s3').scrollIntoView({behavior:'smooth', block:'start'});
+};
+
+function renderPreview(){
+  const p = PLAN;
+  let h = '<div class="pv">';
+  h += '<div class="t">'+esc(p.docTitle)+'</div>';
+  h += '<div class="info">'
+     + '<span>■ 일시 '+esc(p.일시)+'</span>'
+     + '<span>■ 장소 '+esc(p.장소||'-')+'</span>'
+     + '<span>■ 강사 '+esc(p.강사||'-')+'</span>'
+     + '<span>■ 참석 '+p.참석인원+'명 (응답률: '+(p.total/p.참석인원*100).toFixed(1)+'%)</span>'
+     + '</div>';
+
+  h += '<div class="q quant">1. '+esc(p.scoreHeader)+'</div>';
+  h += '<div class="dist">';
+  [10,9,8,7,6,5,4,3,2,1].forEach((s,i) => { if(p.counts[i]) h += '<div>'+s+'점 <b>'+p.counts[i]+'</b></div>'; });
+  h += '<div>평가인원 <b>'+p.total+'</b></div><div>평균 <b>'+p.avg.toFixed(1)+'</b></div>'
+     + '<div>등급 <b>'+p.grade+'</b></div><div>NPS <b>'+(p.nps*100).toFixed(1)+'%</b></div></div>';
+
+  p.blocks.forEach((b,i) => {
+    h += '<div class="q qual">'+(i+2)+'. '+esc(b.title)+'</div><ul>';
+    b.answers.forEach(t => {
+      const tall = t.length > CFG.WRAP_LEN || t.includes('\n');
+      h += '<li class="'+(tall?'tall':'')+'"><span class="n">'+t.length+'자</span><span>'+esc(t)+'</span></li>';
+    });
+    h += '</ul>';
+  });
+  h += '</div>';
+  $('preview').innerHTML = h;
+}
+
+/* ==========================================================
+   XLSX 생성 — 규칙 1~12 적용
+   ========================================================== */
+const thin = {style:'thin'};
+const boxBorder = {top:thin,left:thin,bottom:thin,right:thin};
+const fillOf = argb => ({type:'pattern', pattern:'solid', fgColor:{argb}});
+
+$('dl').onclick = async () => {
+  if (!PLAN) return;
+  $('dl').disabled = true;
+  show('파일 생성 중…','ok');
+  try {
+    const blob = await buildWorkbook();
+    const fname = '강의평가결과_' + PLAN.주제 + '_' +
+      new Date().toISOString().slice(2,10).replace(/-/g,'') + '.xlsx';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    show('다운로드 완료 — <b>'+esc(fname)+'</b>','ok');
+  } catch(e){
+    show('생성 실패: '+esc(e.message),'err');
+  }
+  $('dl').disabled = false;
+};
+
+async function buildWorkbook(){
+  const p = PLAN;
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'IGM 강의평가 확인서 생성기';
+  wb.created = new Date();
+  const ws = wb.addWorksheet('sheet1', {
+    views: [{ showGridLines: false }],
+    pageSetup: { orientation:'portrait', paperSize:9, fitToPage:true, fitToWidth:1, fitToHeight:0,
+                 margins:{left:0.4,right:0.4,top:0.5,bottom:0.5,header:0.3,footer:0.3} }
+  });
+
+  // 열 너비
+  Object.entries(CFG.WIDTHS).forEach(([c,w]) => { ws.getColumn(+c).width = w; });
+
+  const H = {};                       // 행 높이
+  const label = (b=false,sz=CFG.SZ_LABEL) => ({name:CFG.FONT_BODY, size:sz, bold:b});
+  const mid = (hz='left') => ({horizontal:hz, vertical:'middle'});
+
+  // ── ① 제목
+  H[1] = CFG.H_ROW1;
+  ws.mergeCells(2, COL.B, 2, COL.T);
+  const t = ws.getCell(2, COL.B);
+  t.value = p.docTitle;
+  t.font = {name:CFG.FONT_TITLE, size:CFG.SZ_TITLE, bold:true, color:{argb:CFG.C_TITLE_FG}};
+  t.fill = fillOf(CFG.C_TITLE_BG);
+  t.alignment = mid('center');
+  H[2] = CFG.H_TITLE; H[3] = CFG.H_INFO;
+
+  // ── ② 기본 정보 (규칙 11·12)
+  const labels = ['■ 일  시 : ','■ 장  소 :','■ 주  제 : ','■ 강  사 : ','■ 참  석 :'];
+  labels.forEach((txt,i) => {
+    const r = 4+i;
+    ws.mergeCells(r, COL.B, r, COL.C);
+    const c = ws.getCell(r, COL.B);
+    c.value = txt; c.font = label(true); c.alignment = {vertical:'middle'};
+    H[r] = CFG.H_INFO;
+  });
+  const put = (r,col,val,opt={}) => {
+    const c = ws.getCell(r,col);
+    c.value = val;
+    c.font = opt.font || label(true);
+    c.alignment = opt.align || mid('left');
+    if (opt.numFmt) c.numFmt = opt.numFmt;
+    return c;
+  };
+  ws.mergeCells(4, COL.D, 4, COL.G);                 // 일시 D4:G4
+  put(4, COL.D, p.일시, {numFmt:'@'});
+  put(5, COL.D, p.장소);                              // 장소
+  ws.mergeCells(6, COL.D, 6, COL.I);                 // 규칙 11 — 주제 D6:I6 왼쪽 맞춤
+  put(6, COL.D, p.주제);
+  put(7, COL.D, p.강사);                              // 강사
+  put(8, COL.D, p.참석인원, {numFmt:'0"명"'});          // 규칙 12
+  const rate = ws.getCell(8, COL.E);
+  rate.value = { formula:'T13/D8', result: p.total / p.참석인원 };
+  rate.numFmt = '"(응답률: "0.0%")"';
+  rate.font = label(true); rate.alignment = mid('left');
+  H[9] = CFG.H_INFO;
+
+  // ── ③ 1번 정량 문항
+  ws.mergeCells(10, COL.B, 10, COL.T);
+  const q1 = ws.getCell(10, COL.B);
+  q1.value = '1. ' + p.scoreHeader;
+  q1.font = label(true); q1.fill = fillOf(CFG.C_Q_QUANT); q1.alignment = mid('left');
+  H[10] = CFG.H_INFO; H[11] = CFG.H_INFO;
+
+  // 표 머리글 (12행)
+  ws.mergeCells(12, COL.B, 12, COL.D); ws.getCell(12, COL.B).value = '과목';
+  ws.mergeCells(12, COL.E, 12, COL.I); ws.getCell(12, COL.E).value = '강의평가결과';
+  [10,9,8,7,6,5,4,3,2,1].forEach((s,i) => {
+    const c = ws.getCell(12, COL.J+i); c.value = s; c.numFmt = '0_);[Red]\\(0\\)';
+  });
+  ws.getCell(12, COL.T).value = '평가인원';
+  for (let c = COL.B; c <= COL.T; c++){
+    const cell = ws.getCell(12,c);
+    cell.font = label(true); cell.fill = fillOf(CFG.C_TABLE_HEAD);
+    cell.alignment = mid('center'); cell.border = boxBorder;
+  }
+  H[12] = CFG.H_INFO;
+
+  // 표 데이터 (13행) — 규칙 2: 기존 수식 준용
+  ws.mergeCells(13, COL.B, 13, COL.D);
+  const sub = ws.getCell(13, COL.B);
+  sub.value = p.주제;
+  sub.font = {name:CFG.FONT_BODY, size:CFG.SZ_ANSWER};
+  sub.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+
+  const redBold = {name:CFG.FONT_BODY, size:CFG.SZ_LABEL, bold:true, color:{argb:CFG.C_RED}};
+  ws.mergeCells(13, COL.E, 13, 6);
+  Object.assign(ws.getCell(13, COL.E), {
+    value:{ formula:'(J$12*J13+K$12*K13+L$12*L13+M$12*M13+N$12*N13+O$12*O13+P$12*P13+Q$12*Q13+R$12*R13+S$12*S13)/T13',
+            result:p.avg },
+    numFmt:'#,##0.0_ ', font:redBold, alignment:mid('center')
+  });
+  ws.mergeCells(13, COL.G, 13, 8);
+  Object.assign(ws.getCell(13, COL.G), {
+    value:{ formula:'IF(E13>=9,"A+",IF(E13>=8,"A",IF(E13>=7,"B+",IF(E13>=6,"B",IF(E13>=5,"C+",IF(E13>=4,"C",IF(E13>=3,"D+",IF(E13>=2,"D"," "))))))))',
+            result:p.grade },
+    font:redBold, alignment:mid('center')
+  });
+  Object.assign(ws.getCell(13, COL.I), {
+    value:{ formula:'((J13+K13)-(N13+O13+P13+Q13+R13+S13))/T13', result:p.nps },
+    numFmt:'0.0%', font:redBold, alignment:mid('center')
+  });
+  p.counts.forEach((n,i) => {
+    const c = ws.getCell(13, COL.J+i);
+    c.value = n; c.numFmt = '0_);[Red]\\(0\\)';
+    c.font = {name:CFG.FONT_BODY, size:CFG.SZ_ANSWER}; c.alignment = mid('center');
+  });
+  Object.assign(ws.getCell(13, COL.T), {
+    value:{ formula:'SUM(J13:S13)', result:p.total },
+    numFmt:'0_);[Red]\\(0\\)', font:{name:CFG.FONT_BODY, size:CFG.SZ_ANSWER}, alignment:mid('center')
+  });
+  for (let c = COL.B; c <= COL.T; c++) ws.getCell(13,c).border = boxBorder;
+  H[13] = CFG.H_TABLE;
+
+  // 보조열 머리글
+  H[14] = CFG.H_INFO;
+  Object.assign(ws.getCell(14, COL.V), {
+    value:'글자수',
+    font:{name:CFG.FONT_BODY, size:CFG.SZ_HELPER, bold:true},
+    alignment:{vertical:'middle', wrapText:true}
+  });
+
+  // ── ④ 정성 문항 블록
+  let r = 15, lastDataRow = 13;
+  p.blocks.forEach((b, bi) => {
+    // 규칙 3 — 볼드 + #C5D9F1
+    ws.mergeCells(r, COL.B, r, COL.T);
+    const qh = ws.getCell(r, COL.B);
+    qh.value = (bi+2) + '. ' + b.title;
+    qh.font = label(true); qh.fill = fillOf(CFG.C_Q_QUAL); qh.alignment = mid('left');
+    H[r] = CFG.H_HEAD;
+    r++;
+
+    b.answers.forEach(text => {
+      const tall = text.length > CFG.WRAP_LEN || text.includes('\n');  // 규칙 7
+
+      // 규칙 6 — '>' 는 볼드/음영 없음
+      const gt = ws.getCell(r, COL.B);
+      gt.value = '>';
+      gt.font = {name:CFG.FONT_BODY, size:CFG.SZ_ANSWER};
+      gt.fill = fillOf(CFG.C_ANSWER_BG);
+      gt.alignment = mid('left');
+
+      ws.mergeCells(r, COL.C, r, COL.T);
+      const a = ws.getCell(r, COL.C);
+      a.value = text;                                    // 규칙 1 — 원문 그대로
+      a.font = {name:CFG.FONT_BODY, size:CFG.SZ_ANSWER}; // 규칙 4
+      a.fill = fillOf(CFG.C_ANSWER_BG);
+      a.alignment = {horizontal:'left', vertical:'middle', wrapText:tall};
+      for (let c = COL.C; c <= COL.T; c++) ws.getCell(r,c).fill = fillOf(CFG.C_ANSWER_BG);
+
+      const v = ws.getCell(r, COL.V);                     // 규칙 2 — 글자수 수식 유지
+      v.value = { formula:'LEN(C'+r+')', result:text.length };
+      v.font = {name:CFG.FONT_BODY, size:CFG.SZ_HELPER, color:{argb:CFG.C_HELPER}};
+      v.alignment = {vertical:'middle'};
+
+      H[r] = tall ? CFG.H_TALL : CFG.H_SHORT;
+      lastDataRow = r;
+      r++;
+    });
+
+    // 규칙 8 — 블록 사이 공백 행 1개
+    if (bi < p.blocks.length - 1){ H[r] = CFG.H_BLANK; r++; }
+  });
+
+  // 행 높이 적용
+  Object.entries(H).forEach(([row,h]) => { ws.getRow(+row).height = h; });
+
+  // 규칙 9 — 인쇄 영역 A1:U{마지막 데이터 행} (보조열 V~X 제외)
+  // ExcelJS가 열에 $를 자동으로 붙이므로 행에만 $를 표기 → '$A$1:$U$n'
+  ws.pageSetup.printArea = 'A$1:U$' + lastDataRow;
+
+  const buf = await wb.xlsx.writeBuffer();
+  return new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+
+/* 처음부터 다시 */
+$('reset').onclick = () => location.reload();
+</script>
+</body>
+</html>

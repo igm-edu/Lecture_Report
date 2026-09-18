@@ -54,9 +54,15 @@
   .qlist{border:1px solid var(--line);border-radius:7px;overflow:hidden}
   .qitem{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border-bottom:1px solid #eef1f4;font-size:13px}
   .qitem:last-child{border-bottom:0}
-  .qitem input{margin:3px 0 0;flex:0 0 auto;width:15px;height:15px;accent-color:var(--navy)}
+  .qitem input[type=checkbox]{margin:3px 0 0;flex:0 0 auto;width:15px;height:15px;accent-color:var(--navy)}
   .qitem label{cursor:pointer;flex:1}
   .qitem .meta{color:var(--muted);font-size:11.5px;margin-top:2px}
+  .qitem .subj{flex:0 0 190px;padding:5px 8px;font-size:12.5px}
+  .qitem.dim{opacity:.45}
+  .subjhead{display:flex;padding:7px 12px;background:#f4f6f9;border-bottom:1px solid var(--line);
+    font-size:11.5px;font-weight:700;color:var(--muted)}
+  .subjhead span:first-child{flex:1}
+  .subjhead span:last-child{flex:0 0 190px}
 
   /* 미리보기 */
   .pv{border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:12.5px}
@@ -71,9 +77,11 @@
   .pv li:last-child{border-bottom:0}
   .pv li .n{color:var(--muted);flex:0 0 40px;text-align:right;font-variant-numeric:tabular-nums}
   .pv li.tall .n{color:#c77700;font-weight:700}
-  .pv .dist{padding:9px 13px;display:flex;flex-wrap:wrap;gap:6px}
-  .pv .dist div{border:1px solid var(--line);border-radius:5px;padding:3px 8px;background:#fff}
-  .pv .dist b{color:var(--navy)}
+  .pv .qt{width:100%;border-collapse:collapse;font-size:12px}
+  .pv .qt th,.pv .qt td{border:1px solid var(--line);padding:5px 6px;text-align:center}
+  .pv .qt th{background:#D9D9D9;font-weight:700}
+  .pv .qt td.nm{text-align:left;font-weight:700;min-width:110px}
+  .pv .qt td.r{color:#c00;font-weight:700}
 
   /* 버튼 */
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:11px 22px;border:0;border-radius:7px;
@@ -140,12 +148,19 @@
       </div>
 
       <div class="maprow">
-        <b>1번 · 정량 문항 (10점 척도)</b>
-        <select id="scoreCol"></select>
+        <b>1번 · 정량 문항 (10점 척도)
+          <i style="font-weight:400;color:var(--muted)">— 과목이 여러 개면 모두 체크하세요. 체크한 수만큼 표 행이 생깁니다</i></b>
+        <div class="qlist" id="slist">
+          <div class="subjhead"><span>설문 문항</span><span>표에 들어갈 과목명</span></div>
+        </div>
+        <div class="fld" style="margin-top:9px">
+          <label>1번 문항 제목 <i>(표 위에 표시될 문구)</i></label>
+          <input type="text" id="q1title">
+        </div>
       </div>
 
       <div class="maprow">
-        <b>2번부터 · 정성 문항 <i style="font-weight:400;color:var(--muted)">(체크한 순서대로 번호가 매겨집니다)</i></b>
+        <b>2번부터 · 정성 문항 <i style="font-weight:400;color:var(--muted)">(과정 전체 공통 · 체크한 순서대로 번호가 매겨집니다)</i></b>
         <div class="qlist" id="qlist"></div>
       </div>
 
@@ -297,9 +312,39 @@ function prefillFromName(name){
 /* ==========================================================
    STEP 2 — 컬럼 자동 분석 + 폼
    ========================================================== */
+/**
+ * 선택된 정량 문항 머리글들에서 공통 부분(= 문항 제목)과
+ * 서로 다른 부분(= 과목명)을 분리합니다.
+ * 예) "협상의 A to Z - 오늘 들으신 강의를…?" / "NPT 작성훈련 - 오늘 들으신 강의를…?"
+ *     → 과목명 ["협상의 A to Z","NPT 작성훈련"], 제목 "오늘 들으신 강의를…?"
+ */
+const SEP_HEAD = /^[\s\-–—_·:|\]\)\}>]+/;                // 과목명 앞 구분자·닫는 괄호
+const SEP_TAIL = /[\s\-–—_·:|\[\(\{<\]\)\}>]+$/;         // 과목명 뒤 구분자·양쪽 괄호
+const TITLE_HEAD = /^[\s\-–—_·:|\]\)\}>]+/;              // 제목 앞 — 닫는 괄호만 제거
+const TITLE_TAIL = /[\s\-–—_·:|\[\(\{<]+$/;              // 제목 뒤 — 여는 괄호만 제거 ("(10점 만점)" 보존)
+
+function splitSubjects(hs){
+  if (!hs.length) return { names:[], title:'' };
+  if (hs.length === 1) return { names:[''], title: hs[0] };
+
+  let pre = hs[0], suf = hs[0];
+  for (const h of hs.slice(1)){
+    let i = 0; while (i < pre.length && i < h.length && pre[i] === h[i]) i++;
+    pre = pre.slice(0, i);
+    let j = 0; while (j < suf.length && j < h.length && suf[suf.length-1-j] === h[h.length-1-j]) j++;
+    suf = suf.slice(suf.length - j);
+  }
+  const names = hs.map(h =>
+    h.slice(pre.length, h.length - suf.length).replace(SEP_HEAD,'').replace(SEP_TAIL,'').trim() || h);
+
+  let title = pre.replace(TITLE_TAIL,'').trim();
+  if (title.length < 5) title = suf.replace(TITLE_HEAD,'').replace(TITLE_TAIL,'').trim();
+  return { names, title: title || hs[0] };
+}
+
 function analyze(){
   const { headers, body } = RAW;
-  let scoreCol = -1; const qual = []; const stat = [];
+  const score = [], qual = [], stat = [];
 
   for (let c = 0; c < headers.length; c++){
     const h = headers[c];
@@ -314,19 +359,26 @@ function analyze(){
     }
     if (!filled){ stat.push(null); continue; }
     stat.push({filled,num,txt});
-    if (scoreCol === -1 && num/filled >= 0.8) scoreCol = c+1;
-    else if (txt/filled >= 0.5) qual.push(c+1);
+    if (num/filled >= 0.8) score.push(c+1);        // 정량 — 여러 개 가능
+    else if (txt/filled >= 0.5) qual.push(c+1);    // 정성
   }
 
-  // 정량 문항 드롭다운
-  const sc = $('scoreCol'); sc.innerHTML = '';
+  // 정량 문항 체크리스트 (+ 과목명 입력)
+  const sl = $('slist');
+  sl.innerHTML = '<div class="subjhead"><span>설문 문항</span><span>표에 들어갈 과목명</span></div>';
   headers.forEach((h,i) => {
-    if (!h) return;
-    const o = document.createElement('option');
-    o.value = i+1; o.textContent = firstLine(h);
-    if (i+1 === scoreCol) o.selected = true;
-    sc.appendChild(o);
+    if (!h || CFG.META.includes(h)) return;
+    const on = score.includes(i+1);
+    const s = stat[i] || {filled:0};
+    const d = document.createElement('div');
+    d.className = 'qitem' + (on ? '' : ' dim');
+    d.innerHTML =
+      '<input type="checkbox" class="schk" id="s'+i+'" value="'+(i+1)+'"'+(on?' checked':'')+'>'+
+      '<label for="s'+i+'">'+esc(firstLine(h))+'<div class="meta">응답 '+s.filled+'건</div></label>'+
+      '<input type="text" class="subj" id="sn'+i+'" placeholder="자동">';
+    sl.appendChild(d);
   });
+  sl.querySelectorAll('.schk').forEach(c => c.addEventListener('change', refreshSubjects));
 
   // 정성 문항 체크리스트
   const list = $('qlist'); list.innerHTML = '';
@@ -343,9 +395,33 @@ function analyze(){
     list.appendChild(d);
   });
 
+  refreshSubjects();
   $('attend').value = body.length;
   calcRate();
 }
+
+/** 체크 상태가 바뀔 때 과목명·문항 제목을 다시 채웁니다 (사용자가 고친 값은 유지) */
+function refreshSubjects(){
+  const picked = [...document.querySelectorAll('#slist .schk')].filter(c => c.checked);
+  document.querySelectorAll('#slist .qitem').forEach(el => {
+    const c = el.querySelector('.schk');
+    el.classList.toggle('dim', !c.checked);
+  });
+
+  const hs = picked.map(c => firstLine(RAW.headers[+c.value - 1]));
+  const { names, title } = splitSubjects(hs);
+
+  picked.forEach((c, i) => {
+    const inp = $('sn' + (+c.value - 1));
+    if (!inp.dataset.edited) inp.value = names[i] || '';
+  });
+  const t = $('q1title');
+  if (!t.dataset.edited) t.value = title;
+}
+$('q1title').addEventListener('input', e => { e.target.dataset.edited = '1'; });
+document.addEventListener('input', e => {
+  if (e.target.classList && e.target.classList.contains('subj')) e.target.dataset.edited = '1';
+});
 
 function toMin(t){ const p = t.split(':'); return +p[0]*60 + +p[1]; }
 function calcHours(){
@@ -401,29 +477,39 @@ $('build').onclick = () => {
   const qualCols = [...document.querySelectorAll('#qlist input:checked')].map(c => +c.value);
   if (!qualCols.length) return alert('정성 문항을 하나 이상 선택하세요.');
 
-  const scoreCol = +$('scoreCol').value;
+  const scoreChecks = [...document.querySelectorAll('#slist .schk')].filter(c => c.checked);
+  if (!scoreChecks.length) return alert('정량 문항을 하나 이상 선택하세요.');
+
   const 주제 = round ? course + '_' + round : course;
   const hours = $('hours').value.trim();
   const 일시 = $('date').value + ' ' + $('start').value + '~' + $('end').value + (hours ? ' ['+hours+']' : '');
   const client = $('client').value.trim();
 
-  // 점수 집계
-  const tally = {}; for (let i=1;i<=10;i++) tally[i]=0;
-  for (const row of RAW.body){
-    const s = clean(row[scoreCol-1]); const n = Number(s);
-    if (s && !isNaN(n) && n>=1 && n<=10) tally[Math.floor(n)]++;
-  }
-  const counts = [10,9,8,7,6,5,4,3,2,1].map(s => tally[s]);
-  const total = counts.reduce((a,b)=>a+b,0);
-  const avg = total ? [10,9,8,7,6,5,4,3,2,1].reduce((a,s,i)=>a+s*counts[i],0)/total : 0;
-  const grade = avg>=9?'A+':avg>=8?'A':avg>=7?'B+':avg>=6?'B':avg>=5?'C+':avg>=4?'C':avg>=3?'D+':avg>=2?'D':' ';
-  const nps = total ? ((counts[0]+counts[1]) - (counts[4]+counts[5]+counts[6]+counts[7]+counts[8]+counts[9]))/total : 0;
+  // 과목별 점수 집계 — 체크한 정량 문항 수만큼 표 행이 생깁니다
+  const subjects = scoreChecks.map((chk, idx) => {
+    const col = +chk.value - 1;
+    const tally = {}; for (let i=1;i<=10;i++) tally[i]=0;
+    for (const row of RAW.body){
+      const s = clean(row[col]); const n = Number(s);
+      if (s && !isNaN(n) && n>=1 && n<=10) tally[Math.floor(n)]++;
+    }
+    const counts = [10,9,8,7,6,5,4,3,2,1].map(s => tally[s]);
+    const total = counts.reduce((a,b)=>a+b,0);
+    const avg = total ? [10,9,8,7,6,5,4,3,2,1].reduce((a,s,i)=>a+s*counts[i],0)/total : 0;
+    const grade = avg>=9?'A+':avg>=8?'A':avg>=7?'B+':avg>=6?'B':avg>=5?'C+':avg>=4?'C':avg>=3?'D+':avg>=2?'D':' ';
+    const nps = total ? ((counts[0]+counts[1]) - (counts[4]+counts[5]+counts[6]+counts[7]+counts[8]+counts[9]))/total : 0;
+    // 과목명: 입력값 → 자동 추출값 → (단일 과목이면) 과정명
+    const name = $('sn'+col).value.trim() || (scoreChecks.length === 1 ? 주제 : firstLine(RAW.headers[col]));
+    return { name, counts, total, avg, grade, nps };
+  });
+
+  const maxTotal = Math.max(...subjects.map(s => s.total));
 
   PLAN = {
     docTitle: (client ? client+' ' : '') + 주제 + '_강의평가결과',
     일시, 장소:$('place').value.trim(), 주제, 강사:$('teacher').value.trim(), 참석인원:attend,
-    scoreHeader: firstLine(RAW.headers[scoreCol-1]),
-    counts, total, avg, grade, nps,
+    q1title: $('q1title').value.trim() || firstLine(RAW.headers[+scoreChecks[0].value - 1]),
+    subjects, maxTotal,
     blocks: qualCols.map(c => ({ title: firstLine(RAW.headers[c-1]), answers: collectAnswers(c-1) }))
   };
 
@@ -440,14 +526,21 @@ function renderPreview(){
      + '<span>■ 일시 '+esc(p.일시)+'</span>'
      + '<span>■ 장소 '+esc(p.장소||'-')+'</span>'
      + '<span>■ 강사 '+esc(p.강사||'-')+'</span>'
-     + '<span>■ 참석 '+p.참석인원+'명 (응답률: '+(p.total/p.참석인원*100).toFixed(1)+'%)</span>'
+     + '<span>■ 참석 '+p.참석인원+'명 (응답률: '+(p.maxTotal/p.참석인원*100).toFixed(1)+'%)</span>'
      + '</div>';
 
-  h += '<div class="q quant">1. '+esc(p.scoreHeader)+'</div>';
-  h += '<div class="dist">';
-  [10,9,8,7,6,5,4,3,2,1].forEach((s,i) => { if(p.counts[i]) h += '<div>'+s+'점 <b>'+p.counts[i]+'</b></div>'; });
-  h += '<div>평가인원 <b>'+p.total+'</b></div><div>평균 <b>'+p.avg.toFixed(1)+'</b></div>'
-     + '<div>등급 <b>'+p.grade+'</b></div><div>NPS <b>'+(p.nps*100).toFixed(1)+'%</b></div></div>';
+  h += '<div class="q quant">1. '+esc(p.q1title)+'</div>';
+  h += '<table class="qt"><thead><tr><th>과목</th><th>평균</th><th>등급</th><th>NPS</th>'
+     + [10,9,8,7,6,5,4,3,2,1].map(s=>'<th>'+s+'</th>').join('')
+     + '<th>평가인원</th></tr></thead><tbody>';
+  p.subjects.forEach(s => {
+    h += '<tr><td class="nm">'+esc(s.name)+'</td>'
+       + '<td class="r">'+s.avg.toFixed(1)+'</td><td class="r">'+s.grade+'</td>'
+       + '<td class="r">'+(s.nps*100).toFixed(1)+'%</td>'
+       + s.counts.map(n=>'<td>'+n+'</td>').join('')
+       + '<td><b>'+s.total+'</b></td></tr>';
+  });
+  h += '</tbody></table>';
 
   p.blocks.forEach((b,i) => {
     h += '<div class="q qual">'+(i+2)+'. '+esc(b.title)+'</div><ul>';
@@ -540,8 +633,13 @@ async function buildWorkbook(){
   put(6, COL.D, p.주제);
   put(7, COL.D, p.강사);                              // 강사
   put(8, COL.D, p.참석인원, {numFmt:'0"명"'});          // 규칙 12
+  const N = p.subjects.length;                        // 과목 수 = 표 행 수
+  const tableEnd = 12 + N;                            // 마지막 표 행
   const rate = ws.getCell(8, COL.E);
-  rate.value = { formula:'T13/D8', result: p.total / p.참석인원 };
+  rate.value = {
+    formula: N === 1 ? 'T13/D8' : 'MAX(T13:T'+tableEnd+')/D8',
+    result: p.maxTotal / p.참석인원
+  };
   rate.numFmt = '"(응답률: "0.0%")"';
   rate.font = label(true); rate.alignment = mid('left');
   H[9] = CFG.H_INFO;
@@ -549,7 +647,7 @@ async function buildWorkbook(){
   // ── ③ 1번 정량 문항
   ws.mergeCells(10, COL.B, 10, COL.T);
   const q1 = ws.getCell(10, COL.B);
-  q1.value = '1. ' + p.scoreHeader;
+  q1.value = '1. ' + p.q1title;
   q1.font = label(true); q1.fill = fillOf(CFG.C_Q_QUANT); q1.alignment = mid('left');
   H[10] = CFG.H_INFO; H[11] = CFG.H_INFO;
 
@@ -567,52 +665,59 @@ async function buildWorkbook(){
   }
   H[12] = CFG.H_INFO;
 
-  // 표 데이터 (13행) — 규칙 2: 기존 수식 준용
-  ws.mergeCells(13, COL.B, 13, COL.D);
-  const sub = ws.getCell(13, COL.B);
-  sub.value = p.주제;
-  sub.font = {name:CFG.FONT_BODY, size:CFG.SZ_ANSWER};
-  sub.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
-
+  // 표 데이터 (13행부터 과목 수만큼) — 규칙 2: 기존 수식 준용
   const redBold = {name:CFG.FONT_BODY, size:CFG.SZ_LABEL, bold:true, color:{argb:CFG.C_RED}};
-  ws.mergeCells(13, COL.E, 13, 6);
-  Object.assign(ws.getCell(13, COL.E), {
-    value:{ formula:'(J$12*J13+K$12*K13+L$12*L13+M$12*M13+N$12*N13+O$12*O13+P$12*P13+Q$12*Q13+R$12*R13+S$12*S13)/T13',
-            result:p.avg },
-    numFmt:'#,##0.0_ ', font:redBold, alignment:mid('center')
-  });
-  ws.mergeCells(13, COL.G, 13, 8);
-  Object.assign(ws.getCell(13, COL.G), {
-    value:{ formula:'IF(E13>=9,"A+",IF(E13>=8,"A",IF(E13>=7,"B+",IF(E13>=6,"B",IF(E13>=5,"C+",IF(E13>=4,"C",IF(E13>=3,"D+",IF(E13>=2,"D"," "))))))))',
-            result:p.grade },
-    font:redBold, alignment:mid('center')
-  });
-  Object.assign(ws.getCell(13, COL.I), {
-    value:{ formula:'((J13+K13)-(N13+O13+P13+Q13+R13+S13))/T13', result:p.nps },
-    numFmt:'0.0%', font:redBold, alignment:mid('center')
-  });
-  p.counts.forEach((n,i) => {
-    const c = ws.getCell(13, COL.J+i);
-    c.value = n; c.numFmt = '0_);[Red]\\(0\\)';
-    c.font = {name:CFG.FONT_BODY, size:CFG.SZ_ANSWER}; c.alignment = mid('center');
-  });
-  Object.assign(ws.getCell(13, COL.T), {
-    value:{ formula:'SUM(J13:S13)', result:p.total },
-    numFmt:'0_);[Red]\\(0\\)', font:{name:CFG.FONT_BODY, size:CFG.SZ_ANSWER}, alignment:mid('center')
-  });
-  for (let c = COL.B; c <= COL.T; c++) ws.getCell(13,c).border = boxBorder;
-  H[13] = CFG.H_TABLE;
+  p.subjects.forEach((s, i) => {
+    const r = 13 + i;
 
-  // 보조열 머리글
-  H[14] = CFG.H_INFO;
-  Object.assign(ws.getCell(14, COL.V), {
+    ws.mergeCells(r, COL.B, r, COL.D);
+    const sub = ws.getCell(r, COL.B);
+    sub.value = s.name;
+    sub.font = {name:CFG.FONT_BODY, size:CFG.SZ_ANSWER};
+    sub.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+
+    ws.mergeCells(r, COL.E, r, 6);
+    Object.assign(ws.getCell(r, COL.E), {
+      value:{ formula:'(J$12*J'+r+'+K$12*K'+r+'+L$12*L'+r+'+M$12*M'+r+'+N$12*N'+r+
+                      '+O$12*O'+r+'+P$12*P'+r+'+Q$12*Q'+r+'+R$12*R'+r+'+S$12*S'+r+')/T'+r,
+              result:s.avg },
+      numFmt:'#,##0.0_ ', font:redBold, alignment:mid('center')
+    });
+    ws.mergeCells(r, COL.G, r, 8);
+    Object.assign(ws.getCell(r, COL.G), {
+      value:{ formula:'IF(E'+r+'>=9,"A+",IF(E'+r+'>=8,"A",IF(E'+r+'>=7,"B+",IF(E'+r+'>=6,"B",'+
+                      'IF(E'+r+'>=5,"C+",IF(E'+r+'>=4,"C",IF(E'+r+'>=3,"D+",IF(E'+r+'>=2,"D"," "))))))))',
+              result:s.grade },
+      font:redBold, alignment:mid('center')
+    });
+    Object.assign(ws.getCell(r, COL.I), {
+      value:{ formula:'((J'+r+'+K'+r+')-(N'+r+'+O'+r+'+P'+r+'+Q'+r+'+R'+r+'+S'+r+'))/T'+r, result:s.nps },
+      numFmt:'0.0%', font:redBold, alignment:mid('center')
+    });
+    s.counts.forEach((n,k) => {
+      const c = ws.getCell(r, COL.J+k);
+      c.value = n; c.numFmt = '0_);[Red]\\(0\\)';
+      c.font = {name:CFG.FONT_BODY, size:CFG.SZ_ANSWER}; c.alignment = mid('center');
+    });
+    Object.assign(ws.getCell(r, COL.T), {
+      value:{ formula:'SUM(J'+r+':S'+r+')', result:s.total },
+      numFmt:'0_);[Red]\\(0\\)', font:{name:CFG.FONT_BODY, size:CFG.SZ_ANSWER}, alignment:mid('center')
+    });
+    for (let c = COL.B; c <= COL.T; c++) ws.getCell(r,c).border = boxBorder;
+    H[r] = CFG.H_TABLE;
+  });
+
+  // 보조열 머리글 (표 바로 다음 행)
+  const helperRow = tableEnd + 1;
+  H[helperRow] = CFG.H_INFO;
+  Object.assign(ws.getCell(helperRow, COL.V), {
     value:'글자수',
     font:{name:CFG.FONT_BODY, size:CFG.SZ_HELPER, bold:true},
     alignment:{vertical:'middle', wrapText:true}
   });
 
   // ── ④ 정성 문항 블록
-  let r = 15, lastDataRow = 13;
+  let r = helperRow + 1, lastDataRow = tableEnd;
   p.blocks.forEach((b, bi) => {
     // 규칙 3 — 볼드 + #C5D9F1
     ws.mergeCells(r, COL.B, r, COL.T);

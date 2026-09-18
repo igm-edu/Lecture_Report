@@ -19,7 +19,12 @@
   .wrap{max-width:1080px;margin:0 auto;padding:22px 20px 60px}
 
   .step{background:#fff;border:1px solid var(--line);border-radius:10px;margin-bottom:16px;overflow:hidden}
-  .step.off{opacity:.45;pointer-events:none}
+  .step.off{pointer-events:none}
+  .step.off .body{opacity:.4}
+  .step.off .num{background:#a8b1bc}
+  /* 잠긴 단계에는 이유를 표시 — 버튼이 고장난 것처럼 보이지 않게 */
+  .step.off > h2::after{content:attr(data-lock);margin-left:auto;font-size:11.5px;font-weight:600;
+    color:#8a6420;background:#fdf3d8;border:1px solid #f0dda6;border-radius:4px;padding:2px 9px}
   .step > h2{margin:0;padding:13px 18px;font-size:13.5px;font-weight:700;background:#fafbfc;border-bottom:1px solid var(--line);
     display:flex;align-items:center;gap:9px}
   .num{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;border-radius:50%;
@@ -123,7 +128,7 @@
 
   <!-- STEP 2 -->
   <section class="step off" id="s2">
-    <h2><span class="num">2</span> 기본 정보</h2>
+    <h2 data-lock="1단계에서 파일을 먼저 올려주세요"><span class="num">2</span> 기본 정보</h2>
     <div class="body">
       <div class="grid">
         <div class="fld"><label>고객사</label><input type="text" id="client" placeholder="시노펙스"></div>
@@ -172,7 +177,7 @@
 
   <!-- STEP 3 -->
   <section class="step off" id="s3">
-    <h2><span class="num">3</span> 확인 후 다운로드</h2>
+    <h2 data-lock="2단계에서 [미리보기 생성]을 먼저 눌러주세요"><span class="num">3</span> 확인 후 다운로드</h2>
     <div class="body">
       <div id="preview"></div>
       <div class="bar" style="margin-top:16px">
